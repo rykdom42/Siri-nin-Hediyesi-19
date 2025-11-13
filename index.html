@@ -3,7 +3,6 @@
 <head>
 <meta charset="utf-8">
 <title>An Animation for Siri</title>
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <style>
   html,body{
     height:100%;
@@ -11,19 +10,26 @@
     background:#000;
     display:grid;
     place-items:center;
-  }
-  canvas{
-    background:transparent;
-    display:block;
-    cursor:pointer;
+  #wrap{
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  overflow:hidden;
+  background:#000;
+}
 
-    /* EKRANA ORANTILI SIĞDIRMA */
-    width:100vw;
-    height:100vh;
-    max-width:100%;
-    max-height:100%;
-    object-fit:contain;
-  }
+canvas{
+  width:1920px;
+  height:1080px;
+  transform-origin: top left;
+  background:transparent;
+  display:block;
+  cursor:pointer;
+}
+
 
   /* === PAROLA OVERLAY === */
   #gate{
@@ -56,6 +62,7 @@
     font-size:13px;
     color:#ccc;
   }
+  /* Burada ufak bir typo vardı: #pwInput} → #pwInput */
   #pwInput{
     width:100%;
     padding:8px 10px;
@@ -102,8 +109,32 @@
   </div>
 </div>
 
-<canvas id="cv" width="1920" height="1080"></canvas>
+<div id="wrap">
+  <canvas id="cv" width="1920" height="1080"></canvas>
+</div>
+
+
 <script>
+/* ---> SCALE KODU BURAYA <--- */
+
+function resizeCanvas(){
+  const wrap = document.getElementById("wrap");
+  const canvas = document.getElementById("cv");
+
+  const scale = Math.min(
+    wrap.clientWidth / 1920,
+    wrap.clientHeight / 1080
+  );
+
+  canvas.style.transform = `scale(${scale})`;
+}
+
+window.addEventListener("resize", resizeCanvas);
+resizeCanvas();
+
+/* ---> BUNDAN SONRA animasyonların tamamı gelecek <--- */
+
+
 /* === PAROLA === */
 const PASSWORD = "14112006";  // ← İstediğin şifreyi buradan değiştir
 
@@ -489,15 +520,17 @@ function tick(t){
   requestAnimationFrame(tick);
 }
 
-/* === ORTAK TIKLAMA İŞLEMCİSİ (MOUSE + TOUCH) === */
-function handleCanvasTap(clientX, clientY){
+/* === TIKLAMA === */
+canvas.addEventListener('click', e=>{
   if(!assetsReady || !isUnlocked) return;
 
-  const r = canvas.getBoundingClientRect();
+  const r=canvas.getBoundingClientRect();
+
+  // 🔥 ÖLÇEK DÜZELTMELİ TIKLAMA KOORDİNATLARI
   const scaleX = canvas.width  / r.width;
   const scaleY = canvas.height / r.height;
-  const x = (clientX - r.left) * scaleX;
-  const y = (clientY - r.top)  * scaleY;
+  const x = (e.clientX - r.left) * scaleX;
+  const y = (e.clientY - r.top)  * scaleY;
 
   if(state==='intro'){
     if(pointInRect(x,y,INTRO_AREA)){
@@ -581,18 +614,9 @@ function handleCanvasTap(clientX, clientY){
     }
     return;
   }
-}
 
-/* === CLICK + TOUCH EVENTLERİ === */
-canvas.addEventListener('click', e=>{
-  handleCanvasTap(e.clientX, e.clientY);
+  // final, finalScene, fall, move, click1/2/3, jiggle sırasında tıklama yok
 });
-
-canvas.addEventListener('touchstart', e=>{
-  const t = e.touches[0];
-  handleCanvasTap(t.clientX, t.clientY);
-  e.preventDefault(); // scroll vs. engelle
-}, { passive:false });
 </script>
 </body>
 </html>
