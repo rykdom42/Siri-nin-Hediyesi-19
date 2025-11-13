@@ -2,7 +2,7 @@
 <html lang="tr">
 <head>
 <meta charset="utf-8">
-<title>Siri'nin Hediyesi #19</title>
+<title>An Animation for Siri</title>
 <style>
   html,body{
     height:100%;
@@ -16,28 +16,106 @@
     display:block;
     cursor:pointer;
   }
+
+  /* === PAROLA OVERLAY === */
+  #gate{
+    position:fixed;
+    inset:0;
+    background:rgba(0,0,0,0.9);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    z-index:10;
+  }
+  #gatePanel{
+    background:#111;
+    border:1px solid #444;
+    border-radius:12px;
+    padding:24px 32px;
+    color:#fff;
+    font-family:system-ui, sans-serif;
+    min-width:280px;
+    max-width:90vw;
+    text-align:center;
+    box-shadow:0 0 20px rgba(0,0,0,0.7);
+  }
+  #gatePanel h1{
+    margin:0 0 12px;
+    font-size:18px;
+  }
+  #gatePanel p{
+    margin:0 0 16px;
+    font-size:13px;
+    color:#ccc;
+  }
+  #pwInput}{
+    width:100%;
+    padding:8px 10px;
+    border-radius:6px;
+    border:1px solid #555;
+    background:#000;
+    color:#fff;
+    font-size:14px;
+    margin-bottom:10px;
+    box-sizing:border-box;
+  }
+  #pwButton{
+    padding:7px 16px;
+    border-radius:6px;
+    border:none;
+    background:#0f7;
+    color:#000;
+    font-weight:600;
+    cursor:pointer;
+    font-size:14px;
+  }
+  #pwButton:hover{
+    background:#0fa;
+  }
+  #pwError{
+    margin-top:8px;
+    font-size:12px;
+    color:#f55;
+    min-height:16px;
+  }
 </style>
 </head>
 <body>
+
+<!-- PAROLA GİRİŞ EKRANI -->
+<div id="gate">
+  <div id="gatePanel">
+    <h1>Giriş Parolası</h1>
+    <p>Lütfen devam etmek için parolayı gir.</p>
+    <input id="pwInput" type="password" placeholder="Parola" autocomplete="off">
+    <br>
+    <button id="pwButton">Giriş</button>
+    <div id="pwError"></div>
+  </div>
+</div>
+
 <canvas id="cv" width="1920" height="1080"></canvas>
 <script>
-/* === SABİTLER === */
+/* === PAROLA === */
+const PASSWORD = "14112006";  // ← İstediğin şifreyi buradan değiştir
+
+/* === SABİTLER (FPS) === */
 const W=1920, H=1080;
 
 const FPS_INTRO       = 3;   // ball_intro: 2 kare, 3 fps
-const FPS_LOOP        = 12;
-const FPS_LOOP2       = 10;
+const FPS_LOOP        = 9;   // ↓ 12 → 9
+const FPS_LOOP2       = 9;   // ↓ 10 → 9
 const FPS_FALL        = 12;
-const FPS_MOVE        = 10;
-const FPS_LOOP3       = 10;
-const FPS_LOOP4       = 6;   // ball_loop4: 6 fps
-const FPS_KICK        = 10;
-const FPS_CAKE        = 10;
-const FPS_WISH        = 6;
+const FPS_MOVE        = 7;   // ↓ 10 → 7
+const FPS_LOOP3       = 7;   // ↓ 10 → 7
+const FPS_LOOP4       = 6;
+const FPS_KICK        = 7;   // ↓ 10 → 7
+const FPS_CAKE        = 8;   // ↓ 10 → 8
+const FPS_WISH        = 5;   // ↓ 6  → 5
 const FPS_FINAL       = 10;
-const FPS_FINAL_LOOP  = 3;   // final_loop: 2 kare, 3 fps
-const FPS_FINAL_SCENE = 10;  // final_scene: 73 kare, 10 fps
-const FPS_OUTRO       = 3;   // ball_outro: 2 kare, 3 fps
+const FPS_FINAL_LOOP  = 3;
+const FPS_FINAL_SCENE = 9;   // ↓ 10 → 9
+const FPS_OUTRO       = 3;
 
 const INTRO_TOTAL       = 2;
 const LOOP_TOTAL        = 48;
@@ -61,33 +139,42 @@ const OUTRO_TOTAL       = 2;
 const PAD=5, EXT='png';
 
 /* === INTERAKTİF ALANLAR === */
-// ball_intro
 const INTRO_AREA = { type:'rect', x:714, y:188, w:456, h:262 };
-
-// İlk sahne ball_loop
 const AREA_LOOP  = { type:'oval', cx:925, cy:411, rx:65, ry:80 };
-
-// Loop2 sahnesi alanı (move için)
 const AREA_LOOP2 = { type:'oval', cx:981, cy:954, rx:31, ry:39 };
-
-// Loop3 için oval alan
 const AREA_LOOP3 = { type:'oval', cx:1010, cy:950, rx:33, ry:40 };
-
-// Loop4 için dikdörtgen alan (cake trigger)
 const AREA_LOOP4 = { type:'rect', x:658, y:839, w:62, h:112 };
-
-// wish_loop için dikdörtgen alan (final trigger)
 const WISH_AREA  = { type:'rect', x:749, y:278, w:457, h:166 };
-
-// final_loop için oval alan (final_scene trigger)
 const FINAL_LOOP_AREA = { type:'oval', cx:978, cy:125, rx:64, ry:73 };
-
-// ball_outro için dikdörtgen alan (başa dönme)
 const OUTRO_AREA = { type:'rect', x:607, y:121, w:754, h:398 };
 
-/* === CANVAS === */
+/* === CANVAS & PAROLA === */
 const canvas=document.getElementById('cv');
 const ctx=canvas.getContext('2d');
+
+const gate      = document.getElementById('gate');
+const pwInput   = document.getElementById('pwInput');
+const pwButton  = document.getElementById('pwButton');
+const pwError   = document.getElementById('pwError');
+
+let isUnlocked   = false;
+let assetsReady  = false;
+
+function handlePassword(){
+  const val = pwInput.value || "";
+  if(val === PASSWORD){
+    isUnlocked = true;
+    pwError.textContent = "";
+    gate.style.display = "none";
+  }else{
+    pwError.textContent = "Yanlış parola, tekrar dene.";
+  }
+}
+
+pwButton.addEventListener('click', handlePassword);
+pwInput.addEventListener('keydown', e=>{
+  if(e.key === 'Enter'){ handlePassword(); }
+});
 
 /* === YARDIMCI === */
 function loadSeq(path,total){
@@ -104,10 +191,14 @@ function loadSeq(path,total){
   });
 }
 
+// click1/2/3 + jiggle için yumuşatılmış FPS: 20 → 14 → 10
 function easeFps(i,total){
-  if (i < total*0.25) return 28;
-  if (i < total*0.70) return 20;
-  return 14;
+  // İlk %25: 16 fps
+  if (i < total * 0.25) return 16;
+  // %25–70 arası: 12 fps
+  if (i < total * 0.70) return 12;
+  // Son %30: 9 fps
+  return 9;
 }
 
 function pointInOval(x,y,{cx,cy,rx,ry}){
@@ -161,6 +252,7 @@ Promise.all([
   finalLoopSeq  = finalLoop;
   finalSceneSeq = finalScene;
   outroSeq      = outro;
+  assetsReady   = true;
   resetToIntro();
   start();
 });
@@ -277,10 +369,15 @@ function currentStep(){
   if(state==='finalScene') return dtFinalScene;
   if(state==='outro')      return dtOutro;
   const total=currentTotal();
-  return 1000 / easeFps(idx,total); // click/jiggle
+  return 1000 / easeFps(idx,total);
 }
 
 function tick(t){
+  if(!assetsReady || !isUnlocked){
+    requestAnimationFrame(tick);
+    return;
+  }
+
   if(!last) last=t;
   const dt=t-last; last=t; acc+=dt;
 
@@ -300,7 +397,7 @@ function tick(t){
       state==='finalLoop' ||
       state==='outro'
     ){
-      if(idx>=total) idx=0; // tüm loop state’leri
+      if(idx>=total) idx=0;
     }
     else if(state==='fall'){
       if(idx>=total){
@@ -310,21 +407,21 @@ function tick(t){
     }
     else if(state==='move'){
       if(idx>=total){
-        state='loop3';   // move → loop3
+        state='loop3';
         idx=0;
       }
     }
     else if(state==='kick'){
       if(idx>=total){
-        state='loop4';   // kick → loop4
+        state='loop4';
         idx=0;
       }
     }
     else if(state==='cake'){
       if(idx>=total){
-        state='wish';    // cake → wish_loop
+        state='wish';
         idx=0;
-        wishUnlockTime   = Date.now() + 12000; // 12 sn kilit
+        wishUnlockTime   = Date.now() + 12000;
         wishWarningUntil = 0;
       }
     }
@@ -332,12 +429,11 @@ function tick(t){
       if(idx>=total){
         state='finalLoop';
         idx=0;
-        finalLoopUnlockTime = Date.now() + 10000; // 10 sn kilit
+        finalLoopUnlockTime = Date.now() + 10000;
       }
     }
     else if(state==='finalScene'){
       if(idx>=total){
-        // final_scene bitti → ball_outro
         state='outro';
         idx=0;
       }
@@ -356,7 +452,7 @@ function tick(t){
   }
 
   const seq=currentSeq();
-  const img=seq.imgs[idx];
+  const img=seq && seq.imgs[idx];
   if(seq && img && seq.ready[idx]){
     ctx.clearRect(0,0,W,H);
     ctx.drawImage(img,0,0,W,H);
@@ -366,7 +462,6 @@ function tick(t){
     ctx.drawImage(lastDrawn,0,0,W,H);
   }
 
-  // wish sahnesinde uyarı yazısı
   if(state==='wish' && Date.now() < wishWarningUntil){
     ctx.save();
     ctx.font = '16pt sans-serif';
@@ -388,11 +483,12 @@ function tick(t){
 
 /* === TIKLAMA === */
 canvas.addEventListener('click', e=>{
+  if(!assetsReady || !isUnlocked) return;
+
   const r=canvas.getBoundingClientRect();
   const x=e.clientX-r.left;
   const y=e.clientY-r.top;
 
-  // 0) intro → loop
   if(state==='intro'){
     if(pointInRect(x,y,INTRO_AREA)){
       idx=0; acc=0; last=0;
@@ -401,7 +497,6 @@ canvas.addEventListener('click', e=>{
     return;
   }
 
-  // 1) İlk sahne loop
   if(state==='loop'){
     if(!pointInOval(x,y,AREA_LOOP)) return;
     idx=0; acc=0; last=0;
@@ -421,7 +516,6 @@ canvas.addEventListener('click', e=>{
     return;
   }
 
-  // 2) loop2 → move
   if(state==='loop2'){
     if(pointInOval(x,y,AREA_LOOP2)){
       idx=0; acc=0; last=0;
@@ -430,7 +524,6 @@ canvas.addEventListener('click', e=>{
     return;
   }
 
-  // 3) loop3 → kick
   if(state==='loop3'){
     if(pointInOval(x,y,AREA_LOOP3)){
       idx=0; acc=0; last=0;
@@ -439,7 +532,6 @@ canvas.addEventListener('click', e=>{
     return;
   }
 
-  // 4) loop4 → cake
   if(state==='loop4'){
     if(pointInRect(x,y,AREA_LOOP4)){
       idx=0; acc=0; last=0;
@@ -448,11 +540,9 @@ canvas.addEventListener('click', e=>{
     return;
   }
 
-  // 5) wish_loop → final (12 sn kilidi + uyarı)
   if(state==='wish'){
     const now = Date.now();
     if(now < wishUnlockTime){
-      // erken basarsa sadece uyarıyı göster
       wishWarningUntil = now + 2000;
       return;
     }
@@ -463,11 +553,9 @@ canvas.addEventListener('click', e=>{
     return;
   }
 
-  // 6) finalLoop → finalScene (10 sn kilit, mesaj yok)
   if(state==='finalLoop'){
     const now = Date.now();
     if(now < finalLoopUnlockTime){
-      // 10 saniye dolmadan basarsa hiçbir şey olmasın
       return;
     }
     if(pointInOval(x,y,FINAL_LOOP_AREA)){
@@ -477,7 +565,6 @@ canvas.addEventListener('click', e=>{
     return;
   }
 
-  // 7) outro → başa (intro)
   if(state==='outro'){
     if(pointInRect(x,y,OUTRO_AREA)){
       resetToIntro();
